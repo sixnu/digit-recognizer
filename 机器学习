@@ -1,0 +1,56 @@
+import numpy as np
+import pandas as pd
+
+
+data_train=pd.read_csv('.../digit-recognizer/train.csv')
+data_test=pd.read_csv('.../digit-recognizer/test.csv')
+
+sub=pd.read_csv('...digit-recognizer/sample_submission.csv')
+
+
+data_train.shape
+data_test.shape
+
+X=data_train.drop(['label'],axis=1)
+Y=data_train['label']
+
+from sklearn.model_selection import cross_val_score,train_test_split
+x_train, x_valid, y_train, y_valid =train_test_split(X,Y,train_size=0.8,random_state=10)
+
+import lightgbm as lgb
+lgb_train = lgb.Dataset(x_train,label=y_train)
+lgb_valid = lgb.Dataset(x_valid,label=y_valid, reference=lgb_train)
+
+num_round = 10000
+params = {
+    'boosting_type': 'gbdt',
+    'objective':'multiclass',
+    'metric': 'multi_logloss',
+    'num_leaves': 60,
+    'learning_rate': 0.01,
+    'feature_fraction': 0.9,
+    'bagging_fraction': 0.8,
+    'bagging_freq': 5,
+    'sigmoid':1,
+    'verbose': 0,
+    'subsample': 0.7, 
+    'n_estimators':1500,
+    'num_class':10
+}
+
+results = {}
+lgbm = lgb.train(params,
+                lgb_train, 
+                num_boost_round= num_round, 
+                valid_sets=[lgb_valid,lgb_train],
+                valid_names=('validate','train'),
+                early_stopping_rounds =1000,
+                evals_result= results,
+                )
+lgbm_ypred=lgbm.predict(data_test )
+lgbm_valid=lgbm.predict(X)
+
+sub['Label']=np.argmax(lgbm_ypred,axis=1)
+sub['Label'].value_counts()
+
+sub.to_csv('digit_lgb_predictions.csv', index=False)
